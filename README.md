@@ -5,6 +5,7 @@
 This is an example of a concurrent mark and sweep garbage collector written in Rust.
 It is intended to be used in a language runtime where you have complete control over the
 memory layout (stack and heap).
+Throughput is dynamically calculated so the GC takes 1% of the time the program is running.
 
 It runs two threads concurrently:
 

@@ -5,8 +5,6 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     let stack = stack.values.lock().unwrap();
     let mut heap = heap.values.lock().unwrap();
 
-    println!("{:?} {:?}", stack, heap);
-
     let mut marked = Vec::new();
     for value in stack.iter() {
         match value {
