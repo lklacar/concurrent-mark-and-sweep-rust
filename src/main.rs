@@ -12,6 +12,7 @@ enum SizedValue {
 #[derive(Debug, Clone)]
 enum UnsizedValue {
     String(String),
+    List(Vec<SizedValue>),
     Object(HashMap<String, SizedValue>),
     Empty,
 }
@@ -56,6 +57,16 @@ fn gc(stack: &mut Arc<Mutex<Vec<SizedValue>>>, heap: &mut Arc<Mutex<Vec<UnsizedV
                             }
                         }
                     }
+                    UnsizedValue::List(list) => {
+                        for value in list.iter() {
+                            match value {
+                                SizedValue::Address(address) => {
+                                    marked.push(*address);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -64,6 +75,8 @@ fn gc(stack: &mut Arc<Mutex<Vec<SizedValue>>>, heap: &mut Arc<Mutex<Vec<UnsizedV
     }
 
     let mut heap = heap.lock().unwrap();
+    let mut stack = stack.lock().unwrap();
+
     for (index, value) in heap.iter_mut().enumerate() {
         if !marked.contains(&index) {
             *value = UnsizedValue::Empty;
@@ -93,7 +106,7 @@ fn main() {
         let mut heap = heap.clone();
         move || loop {
             gc(&mut stack, &mut heap);
-            thread::sleep(std::time::Duration::from_secs(1));
+            thread::sleep(std::time::Duration::from_millis(1000));
         }
     });
 
