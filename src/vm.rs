@@ -52,7 +52,7 @@ impl Vm {
 
             // thread::sleep(std::time::Duration::from_secs(5));
 
-            let mut stack_values = self.stack.values.lock().unwrap();
+            let stack_values = self.stack.values.lock().unwrap();
             let mut heap_values = self.heap.values.lock().unwrap();
 
             // println!("Removing reference from object to string");
@@ -75,17 +75,29 @@ impl Vm {
             *last_duration = duration;
 
             i += 1;
-            if i % 1000 == 0 {
+            if i % 3000 == 0 {
                 println!("{} instructions", i);
 
                 let mut stack_values = self.stack.values.lock().unwrap();
+
                 stack_values.clear();
+
                 drop(stack_values);
             }
 
-            if i > 100000 {
+            if i > 1000000 {
                 break;
             }
+
+            // every 5000 instructions, run the GC
+            // if i % 5000 == 0 {
+                // print heap
+                // println!("Heap before GC: {:?}", self.heap.values.lock().unwrap());
+
+                gc(&mut self.stack, &mut self.heap);
+                // println!("Heap size: {}", self.heap.values.lock().unwrap().len());
+            // }
+
         }
     }
 
@@ -94,7 +106,7 @@ impl Vm {
 
         self.program();
 
-        gc_handle.join().unwrap();
+        // gc_handle.join().unwrap();
     }
 
     fn start_gc_thread(&mut self) -> JoinHandle<()> {
@@ -104,16 +116,18 @@ impl Vm {
             let duration = self.last_instruction_duration.clone();
             let mut i = 0;
             move || loop {
+                let duration_mutex = duration.lock().unwrap();
+                let duration = duration_mutex.clone();
+                drop(duration_mutex);
+
                 gc(&mut stack, &mut heap);
 
-                // let duration_mutex = duration.lock().unwrap();
-                // let duration = duration_mutex.clone().as_nanos() as u64;
-                // drop(duration_mutex);
-                thread::sleep(Duration::from_nanos(100));
+                let duration = duration.as_nanos() as u64;
+
+
+                let wait_duration = Duration::from_nanos(duration * 100);
+                thread::sleep(wait_duration);
                 i += 1;
-                if i % 1 == 0 {
-                    // println!("GC run {}", i);
-                }
             }
         });
         gc_handle
