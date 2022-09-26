@@ -2,6 +2,7 @@ use crate::gc::gc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crate::heap::{Heap, UnsizedValue};
@@ -76,11 +77,27 @@ impl Vm {
             i += 1;
             if i % 1000 == 0 {
                 println!("{} instructions", i);
+
+                let mut stack_values = self.stack.values.lock().unwrap();
+                stack_values.clear();
+                drop(stack_values);
+            }
+
+            if i > 100000 {
+                break;
             }
         }
     }
 
     pub fn run(&mut self) {
+        let gc_handle = self.start_gc_thread();
+
+        self.program();
+
+        gc_handle.join().unwrap();
+    }
+
+    fn start_gc_thread(&mut self) -> JoinHandle<()> {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
@@ -89,19 +106,16 @@ impl Vm {
             move || loop {
                 gc(&mut stack, &mut heap);
 
-                let duration_mutex = duration.lock().unwrap();
-                let duration = duration_mutex.clone().as_nanos() as u64;
-                drop(duration_mutex);
-                thread::sleep(Duration::from_nanos(duration * 50));
+                // let duration_mutex = duration.lock().unwrap();
+                // let duration = duration_mutex.clone().as_nanos() as u64;
+                // drop(duration_mutex);
+                thread::sleep(Duration::from_nanos(100));
                 i += 1;
                 if i % 1 == 0 {
-                    println!("GC run {}", i);
+                    // println!("GC run {}", i);
                 }
             }
         });
-
-        self.program();
-
-        gc_handle.join().unwrap();
+        gc_handle
     }
 }
