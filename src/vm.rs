@@ -85,7 +85,7 @@ impl Vm {
                 drop(stack_values);
             }
 
-            if i > 1000000 {
+            if i > 100000 {
                 break;
             }
 
@@ -94,7 +94,7 @@ impl Vm {
                 // print heap
                 // println!("Heap before GC: {:?}", self.heap.values.lock().unwrap());
 
-                gc(&mut self.stack, &mut self.heap);
+                // gc(&mut self.stack, &mut self.heap);
                 // println!("Heap size: {}", self.heap.values.lock().unwrap().len());
             // }
 
@@ -122,10 +122,10 @@ impl Vm {
 
                 gc(&mut stack, &mut heap);
 
-                let duration = duration.as_nanos() as u64;
+                // let duration = duration.as_nanos() as u64;
 
 
-                let wait_duration = Duration::from_nanos(duration * 100);
+                let wait_duration = Duration::from_millis(1000);
                 thread::sleep(wait_duration);
                 i += 1;
             }
