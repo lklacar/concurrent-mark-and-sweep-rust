@@ -3,8 +3,13 @@
 ## Introduction
 
 This is an example of a concurrent mark and sweep garbage collector written in Rust.
-It is not intended to be used in production, but rather to demonstrate how a concurrent
-garbage collector can be implemented in Rust.
+It is intended to be used in a language runtime where you have complete control over the
+memory layout (stack and heap).
+
+It runs two threads concurrently:
+
+- One for running the program
+- One for Mark and Sweep garbage collection
 
 ## Usage
 
