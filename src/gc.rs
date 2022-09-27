@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::ops::Sub;
 use std::thread;
 use std::time::Duration;
 use crate::heap::{Heap, UnsizedValue};
@@ -10,12 +11,12 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
 
     let start = std::time::Instant::now();
 
-    let mut marked: Vec<usize> = Vec::new();
+    let mut marked: BTreeSet<usize> = BTreeSet::new();
 
     for value in stack_lock.iter() {
         match value {
             SizedValue::Address(address) => {
-                marked.push(*address);
+                marked.insert(*address);
                 let heap_object = heap_lock.get(*address).unwrap();
 
                 match heap_object {
@@ -23,7 +24,7 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
                         for (_, value) in map.iter() {
                             match value {
                                 SizedValue::Address(address) => {
-                                    marked.push(*address);
+                                    marked.insert(*address);
                                 }
                                 _ => {}
                             }
@@ -33,7 +34,7 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
                         for value in list.iter() {
                             match value {
                                 SizedValue::Address(address) => {
-                                    marked.push(*address);
+                                    marked.insert(*address);
                                 }
                                 _ => {}
                             }
@@ -51,6 +52,16 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
             *value = UnsizedValue::Empty;
         }
     }
+
+
+    let heap_size = heap_lock.len();
+    let all: BTreeSet<usize> = (0..heap_size).collect();
+    let unmarked = all.sub(&marked);
+
+    for index in unmarked.iter() {
+        heap_lock[*index] = UnsizedValue::Empty;
+    }
+
 
     // trim heap by removing all Empty values from the end
     let mut empty_values = 0;

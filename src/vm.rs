@@ -1,6 +1,7 @@
 use crate::gc::gc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicU64;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -11,7 +12,7 @@ use crate::stack::{SizedValue, Stack};
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
-    last_instruction_duration: Arc<Mutex<Duration>>,
+    last_instruction_duration: Arc<AtomicU64>,
 }
 
 impl Vm {
@@ -19,7 +20,7 @@ impl Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            last_instruction_duration: Arc::new(Mutex::new(Duration::new(0, 0))),
+            last_instruction_duration: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -67,12 +68,6 @@ impl Vm {
             drop(stack_values);
             drop(heap_values);
 
-            let end = std::time::Instant::now();
-            let duration = end.duration_since(start);
-            // println!("Last instruction took {:?}ms", duration);
-
-            let mut last_duration = self.last_instruction_duration.lock().unwrap();
-            *last_duration = duration;
 
             i += 1;
             if i % 3000 == 0 {
@@ -85,19 +80,14 @@ impl Vm {
                 drop(stack_values);
             }
 
-            if i > 100000 {
+            if i > 5000 {
                 break;
             }
 
-            // every 5000 instructions, run the GC
-            // if i % 5000 == 0 {
-                // print heap
-                // println!("Heap before GC: {:?}", self.heap.values.lock().unwrap());
+            let end = std::time::Instant::now();
+            let duration = end.duration_since(start);
 
-                // gc(&mut self.stack, &mut self.heap);
-                // println!("Heap size: {}", self.heap.values.lock().unwrap().len());
-            // }
-
+            self.last_instruction_duration.store(duration.as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -113,21 +103,22 @@ impl Vm {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
-            let duration = self.last_instruction_duration.clone();
+            let last_instruction_duration = self.last_instruction_duration.clone();
+
             let mut i = 0;
             move || loop {
-                let duration_mutex = duration.lock().unwrap();
-                let duration = duration_mutex.clone();
-                drop(duration_mutex);
+                // let duration_mutex = duration.lock().unwrap();
+                // let duration = duration_mutex.clone();
+                // drop(duration_mutex);
 
                 gc(&mut stack, &mut heap);
 
-                // let duration = duration.as_nanos() as u64;
+                let wait_duration = last_instruction_duration.load(std::sync::atomic::Ordering::Relaxed);
+                thread::sleep(Duration::from_nanos(wait_duration * 100));
 
 
-                let wait_duration = Duration::from_millis(1000);
-                thread::sleep(wait_duration);
                 i += 1;
+                println!("GC: {}", i);
             }
         });
         gc_handle
