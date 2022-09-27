@@ -1,6 +1,7 @@
 use crate::gc::gc;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -11,7 +12,7 @@ use crate::stack::{SizedValue, Stack};
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
-    last_instruction_duration: Arc<Mutex<Duration>>,
+    last_instruction_duration: Arc<AtomicU64>,
 }
 
 impl Vm {
@@ -19,7 +20,7 @@ impl Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            last_instruction_duration: Arc::new(Mutex::new(Duration::new(0, 0))),
+            last_instruction_duration: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -50,12 +51,8 @@ impl Vm {
             drop(stack_values);
             drop(heap_values);
 
-            // thread::sleep(std::time::Duration::from_secs(5));
-
-            let mut stack_values = self.stack.values.lock().unwrap();
+            let stack_values = self.stack.values.lock().unwrap();
             let mut heap_values = self.heap.values.lock().unwrap();
-
-            // println!("Removing reference from object to string");
 
             let object = heap_values.get_mut(1).unwrap();
             match object {
@@ -67,53 +64,40 @@ impl Vm {
             drop(stack_values);
             drop(heap_values);
 
-            let end = std::time::Instant::now();
-            let duration = end.duration_since(start);
-            // println!("Last instruction took {:?}ms", duration);
-
-            let mut last_duration = self.last_instruction_duration.lock().unwrap();
-            *last_duration = duration;
-
             i += 1;
-            if i % 1000 == 0 {
-                println!("{} instructions", i);
-
+            if i % 20000 == 0 {
                 let mut stack_values = self.stack.values.lock().unwrap();
+
                 stack_values.clear();
+
                 drop(stack_values);
             }
 
-            if i > 100000 {
-                break;
-            }
+            let end = std::time::Instant::now();
+            let duration = end.duration_since(start);
+
+            self.last_instruction_duration.store(
+                duration.as_nanos() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
         }
     }
 
     pub fn run(&mut self) {
-        let gc_handle = self.start_gc_thread();
-
+        let _gc_handle = self.start_gc_thread();
         self.program();
-
-        gc_handle.join().unwrap();
     }
 
     fn start_gc_thread(&mut self) -> JoinHandle<()> {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
-            let duration = self.last_instruction_duration.clone();
-            let mut i = 0;
+            let last_instruction_duration = self.last_instruction_duration.clone();
             move || loop {
                 gc(&mut stack, &mut heap);
-
-                // let duration_mutex = duration.lock().unwrap();
-                // let duration = duration_mutex.clone().as_nanos() as u64;
-                // drop(duration_mutex);
-                thread::sleep(Duration::from_nanos(100));
-                i += 1;
-                if i % 1 == 0 {
-                    // println!("GC run {}", i);
-                }
+                let wait_duration =
+                    last_instruction_duration.load(std::sync::atomic::Ordering::Relaxed);
+                thread::sleep(Duration::from_nanos(wait_duration * 100));
             }
         });
         gc_handle
