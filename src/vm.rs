@@ -12,7 +12,7 @@ use crate::stack::{SizedValue, Stack};
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
-    last_instruction_duration: Arc<AtomicU64>,
+    instruction_counter: Arc<AtomicU64>,
 }
 
 impl Vm {
@@ -20,7 +20,7 @@ impl Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            last_instruction_duration: Arc::new(AtomicU64::new(0)),
+            instruction_counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -48,11 +48,6 @@ impl Vm {
             }
             heap_values.push(object);
 
-            drop(stack_values);
-            drop(heap_values);
-
-            let stack_values = self.stack.values.lock().unwrap();
-            let mut heap_values = self.heap.values.lock().unwrap();
 
             let object = heap_values.get_mut(1).unwrap();
             match object {
@@ -61,25 +56,25 @@ impl Vm {
                 }
                 _ => {}
             }
-            drop(stack_values);
-            drop(heap_values);
 
             i += 1;
             if i % 20000 == 0 {
-                let mut stack_values = self.stack.values.lock().unwrap();
-
+                println!("{} instructions", i);
                 stack_values.clear();
-
-                drop(stack_values);
             }
 
             let end = std::time::Instant::now();
             let duration = end.duration_since(start);
 
-            self.last_instruction_duration.store(
-                duration.as_nanos() as u64,
-                std::sync::atomic::Ordering::Relaxed,
-            );
+            self.instruction_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+            if i > 1000000 {
+                // break;
+            }
+
+            // if i % 30000 == 0 {
+            //     gc(&mut self.stack, &mut self.heap);
+            // }
         }
     }
 
@@ -92,12 +87,12 @@ impl Vm {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
-            let last_instruction_duration = self.last_instruction_duration.clone();
+            let instruction_counter = self.instruction_counter.clone();
             move || loop {
-                gc(&mut stack, &mut heap);
-                let wait_duration =
-                    last_instruction_duration.load(std::sync::atomic::Ordering::Relaxed);
-                thread::sleep(Duration::from_nanos(wait_duration * 100));
+                if instruction_counter.load(std::sync::atomic::Ordering::SeqCst) > 1000 {
+                    gc(&mut stack, &mut heap);
+                    instruction_counter.store(0, std::sync::atomic::Ordering::SeqCst);
+                }
             }
         });
         gc_handle
