@@ -1,15 +1,12 @@
 use std::collections::BTreeSet;
 use std::ops::Sub;
-use std::thread;
-use std::time::Duration;
+
 use crate::heap::{Heap, UnsizedValue};
 use crate::stack::{SizedValue, Stack};
 
 pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     let stack_lock = stack.values.lock().unwrap();
     let mut heap_lock = heap.values.lock().unwrap();
-
-    let start = std::time::Instant::now();
 
     let mut marked: BTreeSet<usize> = BTreeSet::new();
 
@@ -53,7 +50,6 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
         }
     }
 
-
     let heap_size = heap_lock.len();
     let all: BTreeSet<usize> = (0..heap_size).collect();
     let unmarked = all.sub(&marked);
@@ -61,7 +57,6 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     for index in unmarked.iter() {
         heap_lock[*index] = UnsizedValue::Empty;
     }
-
 
     // trim heap by removing all Empty values from the end
     let mut empty_values = 0;
@@ -77,7 +72,4 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     }
     let len = heap_lock.len();
     heap_lock.truncate(len - empty_values);
-
-
-    let end = std::time::Instant::now();
 }
