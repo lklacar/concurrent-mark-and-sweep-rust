@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::thread;
-use std::thread::JoinHandle;
+use std::thread::{JoinHandle, Thread};
 use std::time::Duration;
 
 use crate::heap::{Heap, UnsizedValue};
@@ -12,7 +12,6 @@ use crate::stack::{SizedValue, Stack};
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
-    instruction_counter: Arc<AtomicU64>,
 }
 
 impl Vm {
@@ -20,11 +19,10 @@ impl Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            instruction_counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
-    fn program(&mut self) {
+    fn program(&mut self, gc_thread: &Thread) {
         let mut i = 0;
 
         loop {
@@ -66,33 +64,33 @@ impl Vm {
             let end = std::time::Instant::now();
             let duration = end.duration_since(start);
 
-            self.instruction_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
             if i > 1000000 {
-                // break;
+                break;
             }
 
-            // if i % 30000 == 0 {
-            //     gc(&mut self.stack, &mut self.heap);
-            // }
+            drop(stack_values);
+            drop(heap_values);
+
+            if i % 10000 == 0 {
+                gc_thread.unpark();
+            }
         }
     }
 
     pub fn run(&mut self) {
-        let _gc_handle = self.start_gc_thread();
-        self.program();
+        let gc_handle = self.start_gc_thread();
+        let gc_thread = gc_handle.thread();
+
+        self.program(gc_thread);
     }
 
     fn start_gc_thread(&mut self) -> JoinHandle<()> {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
-            let instruction_counter = self.instruction_counter.clone();
             move || loop {
-                if instruction_counter.load(std::sync::atomic::Ordering::SeqCst) > 1000 {
-                    gc(&mut stack, &mut heap);
-                    instruction_counter.store(0, std::sync::atomic::Ordering::SeqCst);
-                }
+                gc(&mut stack, &mut heap);
+                thread::park();
             }
         });
         gc_handle
