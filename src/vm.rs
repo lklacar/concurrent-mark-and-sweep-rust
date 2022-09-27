@@ -1,10 +1,8 @@
 use crate::gc::gc;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+
 use std::thread;
 use std::thread::{JoinHandle, Thread};
-use std::time::Duration;
 
 use crate::heap::{Heap, UnsizedValue};
 use crate::stack::{SizedValue, Stack};
@@ -46,7 +44,6 @@ impl Vm {
             }
             heap_values.push(object);
 
-
             let object = heap_values.get_mut(1).unwrap();
             match object {
                 UnsizedValue::Object(map) => {
@@ -62,14 +59,11 @@ impl Vm {
             }
 
             let end = std::time::Instant::now();
-            let duration = end.duration_since(start);
+            let _duration = end.duration_since(start);
 
             if i > 1000000 {
                 break;
             }
-
-            drop(stack_values);
-            drop(heap_values);
 
             if i % 10000 == 0 {
                 gc_thread.unpark();

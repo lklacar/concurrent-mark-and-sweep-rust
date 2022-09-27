@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::ops::{Add, Sub};
+use std::ops::Sub;
 
 use crate::heap::{Heap, UnsizedValue};
 use crate::stack::{SizedValue, Stack};
@@ -8,7 +8,7 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     let stack_lock = stack.values.lock().unwrap();
     let mut heap_lock = heap.values.lock().unwrap();
 
-    let start_marking = std::time::Instant::now();
+    let _start_marking = std::time::Instant::now();
 
     let mut marked: BTreeSet<usize> = BTreeSet::new();
     for value in stack_lock.iter() {
@@ -44,9 +44,9 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
             _ => {}
         }
     }
-    let end_marking = std::time::Instant::now();
+    let _end_marking = std::time::Instant::now();
 
-    let start_sweeping = std::time::Instant::now();
+    let _start_sweeping = std::time::Instant::now();
     for (index, value) in heap_lock.iter_mut().enumerate() {
         if !marked.contains(&index) {
             *value = UnsizedValue::Empty;
@@ -75,8 +75,7 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap) {
     }
     let len = heap_lock.len();
     heap_lock.truncate(len - empty_values);
-    let end_sweeping = std::time::Instant::now();
-
+    let _end_sweeping = std::time::Instant::now();
 
     // print percentage of mark time and sweep time
     // let marking_duration = end_marking.sub(start_marking);
