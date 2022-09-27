@@ -1,74 +1,186 @@
 use crate::gc::gc;
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use std::thread;
 use std::thread::{JoinHandle, Thread};
 
 use crate::heap::{Heap, UnsizedValue};
+use crate::{OpCode, PushI32};
 use crate::stack::{SizedValue, Stack};
 
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
+    variable_store: Vec<HashMap<String, SizedValue>>,
+    program: UnsizedValue,
 }
 
 impl Vm {
-    pub fn new() -> Vm {
+    pub fn new(program: UnsizedValue) -> Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
+            variable_store: vec![HashMap::new()],
+            program,
         }
     }
 
     fn program(&mut self, gc_thread: &Thread) {
         let mut i = 0;
+        let program = self.program.as_function();
 
-        loop {
-            let start = std::time::Instant::now();
+        while i < program.len() {
+            let instruction = &program[i];
 
-            let string = UnsizedValue::String("Hello, World!".to_string());
-            let mut stack_values = self.stack.values.lock().unwrap();
-            let mut heap_values = self.heap.values.lock().unwrap();
-            heap_values.push(string);
-
-            stack_values.push(SizedValue::Address(1));
-
-            let mut object = UnsizedValue::Object(HashMap::new());
-            match &mut object {
-                UnsizedValue::Object(map) => {
-                    map.insert("foo".to_string(), SizedValue::I32(42));
-                    map.insert("bar".to_string(), SizedValue::I32(1337));
-                    map.insert("refers_to_string".to_string(), SizedValue::Address(0));
+            match instruction {
+                OpCode::Add => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(a + b);
                 }
-                _ => {}
-            }
-            heap_values.push(object);
-
-            let object = heap_values.get_mut(1).unwrap();
-            match object {
-                UnsizedValue::Object(map) => {
-                    map.remove("refers_to_string");
+                OpCode::Sub => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(a - b);
                 }
-                _ => {}
+                OpCode::Mul => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(a * b);
+                }
+                OpCode::Div => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(b / a);
+                }
+                OpCode::Mod => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(b % a);
+                }
+                OpCode::Neg => {
+                    let a = self.stack.pop();
+                    self.stack.push(-a);
+                }
+                OpCode::Not => {
+                    let a = self.stack.pop();
+                    self.stack.push(!a);
+                }
+                OpCode::And => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(a & b);
+                }
+                OpCode::Or => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(a | b);
+                }
+                OpCode::Eq => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(a == b));
+                }
+                OpCode::Neq => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(a != b));
+                }
+                OpCode::Lt => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(b < a));
+                }
+                OpCode::Gt => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(b > a));
+                }
+                OpCode::Lte => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(b <= a));
+                }
+                OpCode::Gte => {
+                    let a = self.stack.pop();
+                    let b = self.stack.pop();
+                    self.stack.push(SizedValue::Bool(b >= a));
+                }
+                PushI32(value) => {
+                    let value = SizedValue::I32(*value);
+                    self.stack.push(value);
+                }
+                OpCode::PushF32(value) => {
+                    let value = SizedValue::F32(*value);
+                    self.stack.push(value);
+                }
+                OpCode::PushString(value) => {
+                    let value = UnsizedValue::String(value.clone());
+                    let value = self.heap.alloc(value);
+                    self.stack.push(SizedValue::Address(value));
+                }
+                OpCode::PushBool(value) => {
+                    let value = SizedValue::Bool(*value);
+                    self.stack.push(value);
+                }
+                OpCode::PushObject => {
+                    let value = UnsizedValue::Object(HashMap::new());
+                    let value = self.heap.alloc(value);
+                    self.stack.push(SizedValue::Address(value));
+                }
+                OpCode::PushList => {
+                    let value = UnsizedValue::List(Vec::new());
+                    let value = self.heap.alloc(value);
+                    self.stack.push(SizedValue::Address(value));
+                }
+                OpCode::Function(instructions) => {
+                    let value = UnsizedValue::Function(instructions.clone());
+                    let value = self.heap.alloc(value);
+                    self.stack.push(SizedValue::Address(value));
+                }
+                OpCode::Store => {
+                    let name_address = self.stack.pop();
+                    let heap_lock = self.heap.values.lock().unwrap();
+                    let name = heap_lock.get(name_address.as_address().clone()).unwrap().as_string();
+
+                    let value = self.stack.pop();
+                    let variable_store = self.variable_store.last_mut().unwrap();
+                    variable_store.insert(name.clone(), value);
+                }
+                OpCode::Load => {
+                    let name_address = self.stack.pop();
+                    let heap_lock = self.heap.values.lock().unwrap();
+                    let name = heap_lock.get(name_address.as_address().clone()).unwrap().as_string();
+
+                    let variable_store = self.variable_store.last().unwrap();
+                    let value = variable_store.get(name).unwrap();
+                    self.stack.push(value.clone());
+                }
+                OpCode::Call => {
+                    let function = self.stack.pop();
+                    let heap_lock = self.heap.values.lock().unwrap();
+                    let function = heap_lock.get(function.as_address().clone()).unwrap().as_function();
+                    println!("function: {:?}", function);
+                }
+                OpCode::Return => {}
+                OpCode::Jump(offset) => {
+                    i = ((i as i64) + offset) as usize;
+                }
+                OpCode::JumpIfFalse(offset) => {
+                    let value = self.stack.pop();
+                    if !value.as_bool() {
+                        i = ((i as i64) + offset) as usize;
+                    }
+                }
             }
 
             i += 1;
-            if i % 20000 == 0 {
-                println!("{} instructions", i);
-                stack_values.clear();
-            }
-
-            let end = std::time::Instant::now();
-            let _duration = end.duration_since(start);
-
-            if i > 1000000 {
-                break;
-            }
-
-            if i % 10000 == 0 {
-                gc_thread.unpark();
-            }
         }
+
+        println!("Stack: {:?}", self.stack);
+        println!("Heap: {:?}", self.heap);
+        println!("Variable Store: {:?}", self.variable_store);
     }
 
     pub fn run(&mut self) {
@@ -83,7 +195,11 @@ impl Vm {
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
             move || loop {
-                gc(&mut stack, &mut heap);
+                let start = std::time::Instant::now();
+                // gc(&mut stack, &mut heap);
+                let end = std::time::Instant::now();
+                let duration = end.duration_since(start);
+                println!("GC took {:?}", duration);
                 thread::park();
             }
         });
