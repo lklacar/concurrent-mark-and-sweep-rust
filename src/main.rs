@@ -1,18 +1,18 @@
 extern crate core;
 
-use std::fs::File;
-use std::io::Read;
 use crate::heap::UnsizedValue;
-use crate::OpCode::*;
 use crate::opcodes::OpCode;
 use crate::vm::Vm;
+use crate::OpCode::*;
+use std::fs::File;
+use std::io::Read;
 
 mod gc;
 mod heap;
-mod stack;
-mod vm;
 mod opcodes;
+mod stack;
 mod store;
+mod vm;
 
 pub fn new_program(path: &str) -> Vec<u64> {
     let mut file = File::open(path).unwrap();
@@ -31,9 +31,9 @@ pub fn new_program(path: &str) -> Vec<u64> {
     data
 }
 
-
 fn main() {
-    let program = new_program("/home/luka/Projects/Experiments/yapl/yapl-compiler/program.bytecode");
+    let program =
+        new_program("/home/luka/Projects/Experiments/yapl/yapl-compiler/program.bytecode");
     // let program = vec![
     //     PushI64(0),
     //     Store(0),

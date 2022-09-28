@@ -1,6 +1,6 @@
 use crate::stack::SizedValue;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+
 use crate::OpCode;
 
 #[derive(Debug)]
@@ -28,18 +28,14 @@ impl UnsizedValue {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Heap {
     pub(crate) values: Vec<UnsizedValue>,
 }
 
-
 impl Heap {
     pub fn new() -> Heap {
-        Heap {
-            values: Vec::new(),
-        }
+        Heap { values: Vec::new() }
     }
 
     pub fn alloc(&mut self, value: UnsizedValue) -> usize {

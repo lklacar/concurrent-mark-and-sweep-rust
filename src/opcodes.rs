@@ -43,81 +43,100 @@ impl OpCode {
         while i < vec.len() {
             let opcode = vec[i];
 
-            match opcode {
-                1 => result.push(OpCode::Add),
-                2 => result.push(OpCode::Sub),
-                3 => result.push(OpCode::Mul),
-                4 => result.push(OpCode::Div),
-                5 => result.push(OpCode::Mod),
-                6 => result.push(OpCode::Neg),
-                7 => result.push(OpCode::Not),
-                8 => result.push(OpCode::And),
-                9 => result.push(OpCode::Or),
-                10 => result.push(OpCode::Eq),
-                11 => result.push(OpCode::Neq),
-                12 => result.push(OpCode::Lt),
-                13 => result.push(OpCode::Gt),
-                14 => result.push(OpCode::Lte),
-                15 => result.push(OpCode::Gte),
-                16 => {
-                    let value = Self::consume(vec, &mut i);
-                    result.push(OpCode::PushI64(value as i64))
-                }
-                17 => {
-                    let value = Self::consume(vec, &mut i);
-                    let value = f64::from_bits(value);
-                    result.push(OpCode::PushF64(value))
-                }
-                18 => {
-                    let size = Self::consume(vec, &mut i);
-                    let u64s = vec[(i + 1)..(i + size as usize + 1)].to_vec();
-                    i += size as usize;
+            let opcode = Self::from_u64(vec, &mut i, opcode);
 
-                    let bytes = u64s.iter()
-                        .flat_map(|u| u.to_le_bytes().to_vec())
-                        .collect::<Vec<u8>>();
-
-                    let string = String::from_utf8(bytes).unwrap();
-                    let string = string.trim_end_matches(char::from(0)).to_string();
-                    result.push(OpCode::PushString(string));
-                }
-                19 => {
-                    i += 1;
-                    let value = vec[i];
-                    let value = value != 0;
-                    result.push(OpCode::PushBool(value))
-                }
-                20 => result.push(OpCode::PushObject),
-                21 => result.push(OpCode::PushList),
-                22 => result.push(OpCode::Function(Vec::new())),
-                23 => {
-                    i += 1;
-                    let address = vec[i];
-                    result.push(OpCode::Store(address as usize));
-                }
-                24 => {
-                    let offset = Self::consume(vec, &mut i);
-                    result.push(OpCode::Load(offset as usize));
-                }
-                25 => {
-                    let offset = Self::consume(vec, &mut i);
-                    result.push(OpCode::Jump(offset as i64));
-                }
-                26 => {
-                    i += 1;
-                    let offset = vec[i];
-                    result.push(OpCode::JumpIfFalse(offset as i64));
-                }
-                27 => result.push(OpCode::Call),
-                28 => result.push(OpCode::Return),
-                _ => panic!("Unknown opcode {}", opcode),
-            }
+            result.push(opcode);
 
             i += 1;
         }
 
-
         return result;
+    }
+
+    fn from_u64(vec: &Vec<u64>, mut i: &mut usize, opcode: u64) -> OpCode {
+        let opcode = match opcode {
+            1 => OpCode::Add,
+            2 => OpCode::Sub,
+            3 => OpCode::Mul,
+            4 => OpCode::Div,
+            5 => OpCode::Mod,
+            6 => OpCode::Neg,
+            7 => OpCode::Not,
+            8 => OpCode::And,
+            9 => OpCode::Or,
+            10 => OpCode::Eq,
+            11 => OpCode::Neq,
+            12 => OpCode::Lt,
+            13 => OpCode::Gt,
+            14 => OpCode::Lte,
+            15 => OpCode::Gte,
+            16 => {
+                let value = Self::consume(vec, &mut i);
+                OpCode::PushI64(value as i64)
+            }
+            17 => {
+                let value = Self::consume(vec, &mut i);
+                let value = f64::from_bits(value);
+                OpCode::PushF64(value)
+            }
+            18 => {
+                let size = Self::consume(vec, &mut i);
+                let u64s = vec[(*i + 1)..(*i + size as usize + 1)].to_vec();
+                *i += size as usize;
+
+                let bytes = u64s
+                    .iter()
+                    .flat_map(|u| u.to_le_bytes().to_vec())
+                    .collect::<Vec<u8>>();
+
+                let string = String::from_utf8(bytes).unwrap();
+                let string = string.trim_end_matches(char::from(0)).to_string();
+                OpCode::PushString(string)
+            }
+            19 => {
+                *i += 1;
+                let value = vec[*i];
+                let value = value != 0;
+                OpCode::PushBool(value)
+            }
+            20 => OpCode::PushObject,
+            21 => OpCode::PushList,
+            22 => {
+                let size = Self::consume(vec, &mut i);
+                let mut func = Vec::new();
+                let mut j = 0;
+                while j < size {
+                    let opcode = Self::consume(vec, &mut i);
+                    let opcode = Self::from_u64(vec, &mut i, opcode);
+                    func.push(opcode);
+                    j += 1;
+                }
+
+                OpCode::Function(func)
+            },
+            23 => {
+                *i += 1;
+                let address = vec[*i];
+                OpCode::Store(address as usize)
+            }
+            24 => {
+                let offset = Self::consume(vec, &mut i);
+                OpCode::Load(offset as usize)
+            }
+            25 => {
+                let offset = Self::consume(vec, &mut i);
+                OpCode::Jump(offset as i64)
+            }
+            26 => {
+                *i += 1;
+                let offset = vec[*i];
+                OpCode::JumpIfFalse(offset as i64)
+            }
+            27 => OpCode::Call,
+            28 => OpCode::Return,
+            _ => panic!("Unknown opcode {}", opcode),
+        };
+        opcode
     }
 
     fn consume(vec: &Vec<u64>, i: &mut usize) -> u64 {

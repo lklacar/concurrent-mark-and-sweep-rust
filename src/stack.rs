@@ -1,7 +1,4 @@
 use std::ops::{Add, BitAnd, BitOr, Div, Mul, Neg, Not, Rem, Sub};
-use std::sync::{Arc, Mutex};
-use crate::heap::Heap;
-use crate::UnsizedValue;
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum SizedValue {
@@ -11,7 +8,6 @@ pub enum SizedValue {
     Address(usize),
     Null,
 }
-
 
 impl SizedValue {
     pub fn as_address(&self) -> &usize {
@@ -35,7 +31,6 @@ impl SizedValue {
         }
     }
 }
-
 
 impl Add for SizedValue {
     type Output = Self;
@@ -114,7 +109,6 @@ impl Not for SizedValue {
     }
 }
 
-
 impl BitAnd for SizedValue {
     type Output = Self;
 
@@ -137,17 +131,15 @@ impl BitOr for SizedValue {
     }
 }
 
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Stack {
     pub(crate) values: Vec<SizedValue>,
 }
 
 impl Stack {
     pub fn new() -> Stack {
-        Stack {
-            values: Vec::new(),
-        }
+        let values = Vec::with_capacity(100);
+        Stack { values }
     }
 
     pub fn push(&mut self, value: SizedValue) {

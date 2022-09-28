@@ -1,13 +1,12 @@
-use crate::gc::gc;
 use std::collections::HashMap;
 
 use std::thread;
-use std::thread::{JoinHandle, Thread};
+use std::thread::JoinHandle;
 
 use crate::heap::{Heap, UnsizedValue};
-use crate::{OpCode, PushI64};
 use crate::stack::{SizedValue, Stack};
 use crate::store::Store;
+use crate::{OpCode, PushI64};
 
 pub struct Vm {
     pub stack: Stack,
@@ -15,15 +14,12 @@ pub struct Vm {
     store: Store,
 }
 
-
 macro_rules! heap_load {
     ($self:ident, $address:ident, $name:ident) => {
         let heap_lock = &$self.heap.values;
         let $name = heap_lock.get($address.as_address().clone()).unwrap();
-    }
+    };
 }
-
-
 
 impl Vm {
     pub fn new() -> Vm {
@@ -173,7 +169,6 @@ impl Vm {
                 }
             }
 
-
             i += 1;
         }
 
@@ -181,7 +176,6 @@ impl Vm {
         println!("Heap: {:?}", self.heap);
         println!("Variable Store: {:?}", self.store);
     }
-
 
     pub fn run(&mut self, program: &UnsizedValue) {
         // let gc_handle = self.start_gc_thread();

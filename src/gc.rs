@@ -7,7 +7,7 @@ use crate::store::Store;
 
 pub fn gc(stack: &mut Stack, heap: &mut Heap, store: &mut Store) {
     let stack_lock = &stack.values;
-    let mut heap_lock = &mut heap.values;
+    let heap_lock = &mut heap.values;
     let variables_lock = &store.values;
 
     // get only values that are addresses
