@@ -16,7 +16,7 @@ pub enum OpCode {
     Lte,
     Gte,
 
-    PushI32(i32),
+    PushI64(i64),
     PushF32(f32),
     PushString(String),
     PushBool(bool),

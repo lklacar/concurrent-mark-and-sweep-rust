@@ -10,26 +10,27 @@ mod heap;
 mod stack;
 mod vm;
 mod opcodes;
+mod store;
 
 fn main() {
     let program = vec![
-        PushI32(0),
+        PushI64(0),
         PushString("sum".to_string()),
         Store,
 
-        PushI32(0),
+        PushI64(0),
         PushString("i".to_string()),
         Store,
 
-        PushI32(200),
         PushString("i".to_string()),
         Load,
+        PushI64(10000),
+        Lt,
 
-        Gt,
-        JumpIfFalse(200),
-        PushString("sum".to_string()),
-        Load,
+        JumpIfFalse(500),
         PushString("i".to_string()),
+        Load,
+        PushString("sum".to_string()),
         Load,
         Add,
         PushString("sum".to_string()),
@@ -37,15 +38,14 @@ fn main() {
 
         PushString("i".to_string()),
         Load,
-        PushI32(1),
+        PushI64(1),
         Add,
         PushString("i".to_string()),
         Store,
-
         Jump(-19),
     ];
 
     let program = UnsizedValue::Function(program);
 
-    Vm::new(program).run();
+    Vm::new().run(&program);
 }

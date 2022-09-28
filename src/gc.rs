@@ -3,15 +3,27 @@ use std::ops::Sub;
 
 use crate::heap::{Heap, UnsizedValue};
 use crate::stack::{SizedValue, Stack};
+use crate::store::Store;
 
-pub fn gc(stack: &mut Stack, heap: &mut Heap) {
+pub fn gc(stack: &mut Stack, heap: &mut Heap, store: &mut Store) {
     let stack_lock = stack.values.lock().unwrap();
     let mut heap_lock = heap.values.lock().unwrap();
+    let variables_lock = store.values.lock().unwrap();
+
+    // get only values that are addresses
+    let mut variables = Vec::new();
+    for store in variables_lock.iter() {
+        for (_, value) in store.iter() {
+            if let SizedValue::Address(_) = value {
+                variables.push(value);
+            }
+        }
+    }
 
     let _start_marking = std::time::Instant::now();
 
     let mut marked: BTreeSet<usize> = BTreeSet::new();
-    for value in stack_lock.iter() {
+    for value in stack_lock.iter().chain(variables) {
         match value {
             SizedValue::Address(address) => {
                 marked.insert(*address);

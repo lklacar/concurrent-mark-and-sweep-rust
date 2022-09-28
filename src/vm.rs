@@ -1,36 +1,53 @@
 use crate::gc::gc;
 use std::collections::HashMap;
-use std::hash::Hash;
 
 use std::thread;
 use std::thread::{JoinHandle, Thread};
 
 use crate::heap::{Heap, UnsizedValue};
-use crate::{OpCode, PushI32};
+use crate::{OpCode, PushI64};
 use crate::stack::{SizedValue, Stack};
+use crate::store::Store;
 
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
-    variable_store: Vec<HashMap<String, SizedValue>>,
-    program: UnsizedValue,
+    store: Store,
 }
 
+
+macro_rules! heap_load {
+    ($self:ident, $address:ident, $name:ident) => {
+        let heap_lock = $self.heap.values.lock().unwrap();
+        let $name = heap_lock.get($address.as_address().clone()).unwrap();
+    }
+}
+
+
+
 impl Vm {
-    pub fn new(program: UnsizedValue) -> Vm {
+    pub fn new() -> Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            variable_store: vec![HashMap::new()],
-            program,
+            store: Store::new(),
         }
     }
 
-    fn program(&mut self, gc_thread: &Thread) {
+    fn execute(&mut self, program: &UnsizedValue, gc_thread: &Thread) {
         let mut i = 0;
-        let program = self.program.as_function();
-
+        let program = program.as_function();
+        self.store.push();
+        let mut counter = 0;
         while i < program.len() {
+            counter += 1;
+            if counter % 100 == 0 {
+                let mut stack = self.stack.clone();
+                let mut heap = self.heap.clone();
+                let mut store = self.store.clone();
+                gc(&mut stack, &mut heap, &mut store);
+            }
+
             let instruction = &program[i];
 
             match instruction {
@@ -107,8 +124,8 @@ impl Vm {
                     let b = self.stack.pop();
                     self.stack.push(SizedValue::Bool(b >= a));
                 }
-                PushI32(value) => {
-                    let value = SizedValue::I32(*value);
+                PushI64(value) => {
+                    let value = SizedValue::I64(*value);
                     self.stack.push(value);
                 }
                 OpCode::PushF32(value) => {
@@ -141,28 +158,17 @@ impl Vm {
                 }
                 OpCode::Store => {
                     let name_address = self.stack.pop();
-                    let heap_lock = self.heap.values.lock().unwrap();
-                    let name = heap_lock.get(name_address.as_address().clone()).unwrap().as_string();
-
+                    heap_load!(self, name_address, name);
                     let value = self.stack.pop();
-                    let variable_store = self.variable_store.last_mut().unwrap();
-                    variable_store.insert(name.clone(), value);
+                    self.store.set(name.as_string().clone(), value);
                 }
                 OpCode::Load => {
                     let name_address = self.stack.pop();
-                    let heap_lock = self.heap.values.lock().unwrap();
-                    let name = heap_lock.get(name_address.as_address().clone()).unwrap().as_string();
-
-                    let variable_store = self.variable_store.last().unwrap();
-                    let value = variable_store.get(name).unwrap();
-                    self.stack.push(value.clone());
+                    heap_load!(self, name_address, name);
+                    let value = self.store.get(name.as_string().clone());
+                    self.stack.push(value);
                 }
-                OpCode::Call => {
-                    let function = self.stack.pop();
-                    let heap_lock = self.heap.values.lock().unwrap();
-                    let function = heap_lock.get(function.as_address().clone()).unwrap().as_function();
-                    println!("function: {:?}", function);
-                }
+                OpCode::Call => {}
                 OpCode::Return => {}
                 OpCode::Jump(offset) => {
                     i = ((i as i64) + offset) as usize;
@@ -175,32 +181,35 @@ impl Vm {
                 }
             }
 
+
             i += 1;
         }
 
-        println!("Stack: {:?}", self.stack);
-        println!("Heap: {:?}", self.heap);
-        println!("Variable Store: {:?}", self.variable_store);
+        // println!("Stack: {:?}", self.stack);
+        // println!("Heap: {:?}", self.heap);
+        println!("Variable Store: {:?}", self.store);
     }
 
-    pub fn run(&mut self) {
+
+    pub fn run(&mut self, program: &UnsizedValue) {
         let gc_handle = self.start_gc_thread();
         let gc_thread = gc_handle.thread();
 
-        self.program(gc_thread);
+        self.execute(program, gc_thread);
     }
 
-    fn start_gc_thread(&mut self) -> JoinHandle<()> {
+    fn start_gc_thread(&self) -> JoinHandle<()> {
         let gc_handle = thread::spawn({
             let mut stack = self.stack.clone();
             let mut heap = self.heap.clone();
+            let mut store = self.store.clone();
             move || loop {
+                thread::park();
                 let start = std::time::Instant::now();
-                // gc(&mut stack, &mut heap);
+                gc(&mut stack, &mut heap, &mut store);
                 let end = std::time::Instant::now();
                 let duration = end.duration_since(start);
                 println!("GC took {:?}", duration);
-                thread::park();
             }
         });
         gc_handle

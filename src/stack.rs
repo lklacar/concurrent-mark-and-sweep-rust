@@ -1,9 +1,11 @@
 use std::ops::{Add, BitAnd, BitOr, Div, Mul, Neg, Not, Rem, Sub};
 use std::sync::{Arc, Mutex};
+use crate::heap::Heap;
+use crate::UnsizedValue;
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum SizedValue {
-    I32(i32),
+    I64(i64),
     F32(f32),
     Bool(bool),
     Address(usize),
@@ -13,8 +15,8 @@ pub enum SizedValue {
 impl SizedValue {
     pub fn as_address(&self) -> &usize {
         match self {
-            SizedValue::Address(a) => a,
-            _ => panic!("Expected address, got {:?}", self),
+            SizedValue::Address(address) => address,
+            _ => panic!("Cannot convert to address"),
         }
     }
 
@@ -32,8 +34,8 @@ impl Add for SizedValue {
 
     fn add(self, other: Self) -> Self {
         match (self, other) {
-            (SizedValue::I32(a), SizedValue::I32(b)) => SizedValue::I32(a + b),
-            _ => panic!("Cannot add non-i32 values"),
+            (SizedValue::I64(a), SizedValue::I64(b)) => SizedValue::I64(a + b),
+            _ => panic!("Cannot add non-i64 values"),
         }
     }
 }
@@ -43,7 +45,7 @@ impl Sub for SizedValue {
 
     fn sub(self, other: Self) -> Self {
         match (self, other) {
-            (SizedValue::I32(a), SizedValue::I32(b)) => SizedValue::I32(a - b),
+            (SizedValue::I64(a), SizedValue::I64(b)) => SizedValue::I64(a - b),
             _ => panic!("Cannot subtract non-i32 values"),
         }
     }
@@ -54,7 +56,7 @@ impl Mul for SizedValue {
 
     fn mul(self, other: Self) -> Self {
         match (self, other) {
-            (SizedValue::I32(a), SizedValue::I32(b)) => SizedValue::I32(a * b),
+            (SizedValue::I64(a), SizedValue::I64(b)) => SizedValue::I64(a * b),
             _ => panic!("Cannot multiply non-i32 values"),
         }
     }
@@ -65,7 +67,7 @@ impl Div for SizedValue {
 
     fn div(self, other: Self) -> Self {
         match (self, other) {
-            (SizedValue::I32(a), SizedValue::I32(b)) => SizedValue::I32(a / b),
+            (SizedValue::I64(a), SizedValue::I64(b)) => SizedValue::I64(a / b),
             _ => panic!("Cannot divide non-i32 values"),
         }
     }
@@ -76,7 +78,7 @@ impl Rem for SizedValue {
 
     fn rem(self, other: Self) -> Self {
         match (self, other) {
-            (SizedValue::I32(a), SizedValue::I32(b)) => SizedValue::I32(a % b),
+            (SizedValue::I64(a), SizedValue::I64(b)) => SizedValue::I64(a % b),
             _ => panic!("Cannot modulo non-i32 values"),
         }
     }
@@ -87,7 +89,7 @@ impl Neg for SizedValue {
 
     fn neg(self) -> Self {
         match self {
-            SizedValue::I32(a) => SizedValue::I32(-a),
+            SizedValue::I64(a) => SizedValue::I64(-a),
             _ => panic!("Cannot negate non-i32 values"),
         }
     }
