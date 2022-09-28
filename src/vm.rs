@@ -44,28 +44,28 @@ impl Vm {
 
             match instruction {
                 OpCode::Add => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(a + b);
                 }
                 OpCode::Sub => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(a - b);
                 }
                 OpCode::Mul => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(a * b);
                 }
                 OpCode::Div => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(b / a);
                 }
                 OpCode::Mod => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(b % a);
                 }
                 OpCode::Neg => {
@@ -77,23 +77,23 @@ impl Vm {
                     self.stack.push(!a);
                 }
                 OpCode::And => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(a & b);
                 }
                 OpCode::Or => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(a | b);
                 }
                 OpCode::Eq => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(SizedValue::Bool(a == b));
                 }
                 OpCode::Neq => {
-                    let a = self.stack.pop();
                     let b = self.stack.pop();
+                    let a = self.stack.pop();
                     self.stack.push(SizedValue::Bool(a != b));
                 }
                 OpCode::Lt => {
@@ -156,7 +156,17 @@ impl Vm {
                     let value = self.store.get(address.clone());
                     self.stack.push(value);
                 }
-                OpCode::Call => {}
+                OpCode::Call => {
+                    let address = self.stack.pop();
+                    let address = address.as_address();
+                    let variable_address = self.store.get(address.clone());
+
+                    let function = self.heap.get(variable_address.as_address().clone());
+
+                    //TODO: Do this without cloning the function
+                    self.execute(&function.clone());
+
+                }
                 OpCode::Return => {}
                 OpCode::Jump(offset) => {
                     i = ((i as i64) + offset) as usize;
@@ -172,7 +182,7 @@ impl Vm {
             i += 1;
         }
 
-        // println!("Stack: {:?}", self.stack);
+        println!("Stack: {:?}", self.stack);
         println!("Heap: {:?}", self.heap);
         println!("Variable Store: {:?}", self.store);
     }

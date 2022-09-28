@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::OpCode;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnsizedValue {
     String(String),
     List(Vec<SizedValue>),
@@ -33,6 +33,7 @@ pub struct Heap {
     pub(crate) values: Vec<UnsizedValue>,
 }
 
+
 impl Heap {
     pub fn new() -> Heap {
         Heap { values: Vec::new() }
@@ -49,5 +50,9 @@ impl Heap {
 
     pub fn pop(&mut self) -> UnsizedValue {
         self.values.pop().unwrap()
+    }
+
+    pub fn get(&self, address: usize) -> &UnsizedValue {
+        &self.values[address]
     }
 }
