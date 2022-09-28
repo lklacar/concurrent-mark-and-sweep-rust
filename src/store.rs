@@ -4,32 +4,24 @@ use crate::stack::SizedValue;
 
 #[derive(Debug, Clone)]
 pub struct Store {
-    pub values: Arc<Mutex<Vec<HashMap<String, SizedValue>>>>,
+    pub values: Vec<SizedValue>,
 }
 
 
 impl Store {
     pub fn new() -> Store {
+        let mut vec = Vec::new();
+        vec.resize(10, SizedValue::Null);
         Store {
-            values: Arc::new(Mutex::new(Vec::new())),
+            values: vec
         }
     }
 
-    pub fn set(&self, key: String, value: SizedValue) {
-        let mut values = self.values.lock().unwrap();
-        values.last_mut().unwrap().insert(key, value);
+    pub fn set(&mut self, key: usize, value: SizedValue) {
+        self.values[key] = value;
     }
 
-    pub fn get(&self, key: String) -> SizedValue {
-        let values = self.values.lock().unwrap();
-        values.last().unwrap().get(&key).unwrap().clone()
-    }
-
-    pub fn push(&mut self) {
-        self.values.lock().unwrap().push(HashMap::new());
-    }
-
-    pub fn pop(&mut self) {
-        self.values.lock().unwrap().pop();
+    pub fn get(&self, key: usize) -> SizedValue {
+        self.values[key].clone()
     }
 }

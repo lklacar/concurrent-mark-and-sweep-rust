@@ -1,5 +1,7 @@
 extern crate core;
 
+use std::fs::File;
+use std::io::Read;
 use crate::heap::UnsizedValue;
 use crate::OpCode::*;
 use crate::opcodes::OpCode;
@@ -12,38 +14,46 @@ mod vm;
 mod opcodes;
 mod store;
 
+pub fn new_program(path: &str) -> Vec<u64> {
+    let mut file = File::open(path).unwrap();
+    let mut data = Vec::new();
+    file.read_to_end(&mut data).unwrap();
+
+    let data = data
+        .chunks(8)
+        .map(|x| {
+            let mut y = [0; 8];
+            y.copy_from_slice(x);
+            u64::from_be_bytes(y)
+        })
+        .collect::<Vec<u64>>();
+
+    data
+}
+
+
 fn main() {
-    let program = vec![
-        PushI64(0),
-        PushString("sum".to_string()),
-        Store,
-
-        PushI64(0),
-        PushString("i".to_string()),
-        Store,
-
-        PushString("i".to_string()),
-        Load,
-        PushI64(10000),
-        Lt,
-
-        JumpIfFalse(500),
-        PushString("i".to_string()),
-        Load,
-        PushString("sum".to_string()),
-        Load,
-        Add,
-        PushString("sum".to_string()),
-        Store,
-
-        PushString("i".to_string()),
-        Load,
-        PushI64(1),
-        Add,
-        PushString("i".to_string()),
-        Store,
-        Jump(-19),
-    ];
+    let program = new_program("/home/luka/Projects/Experiments/yapl/yapl-compiler/program.bytecode");
+    // let program = vec![
+    //     PushI64(0),
+    //     Store(0),
+    //     PushI64(0),
+    //     Store(1),
+    //     Load(1),
+    //     PushI64(10),
+    //     Lt,
+    //     JumpIfFalse(500),
+    //     Load(1),
+    //     Load(0),
+    //     Add,
+    //     Store(0),
+    //     Load(1),
+    //     PushI64(1),
+    //     Add,
+    //     Store(1),
+    //     Jump(-13),
+    // ];
+    let program = OpCode::from_vec(&program);
 
     let program = UnsizedValue::Function(program);
 

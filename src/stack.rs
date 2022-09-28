@@ -6,9 +6,10 @@ use crate::UnsizedValue;
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum SizedValue {
     I64(i64),
-    F32(f32),
+    F64(f64),
     Bool(bool),
     Address(usize),
+    Null,
 }
 
 
@@ -17,6 +18,13 @@ impl SizedValue {
         match self {
             SizedValue::Address(address) => address,
             _ => panic!("Cannot convert to address"),
+        }
+    }
+
+    pub fn as_usize(&self) -> usize {
+        match self {
+            SizedValue::I64(address) => *address as usize,
+            _ => panic!("Cannot convert to usize"),
         }
     }
 
@@ -132,21 +140,21 @@ impl BitOr for SizedValue {
 
 #[derive(Debug, Clone)]
 pub struct Stack {
-    pub(crate) values: Arc<Mutex<Vec<SizedValue>>>,
+    pub(crate) values: Vec<SizedValue>,
 }
 
 impl Stack {
     pub fn new() -> Stack {
         Stack {
-            values: Arc::new(Mutex::new(Vec::new())),
+            values: Vec::new(),
         }
     }
 
     pub fn push(&mut self, value: SizedValue) {
-        self.values.lock().unwrap().push(value);
+        self.values.push(value);
     }
 
     pub fn pop(&mut self) -> SizedValue {
-        self.values.lock().unwrap().pop().unwrap()
+        self.values.pop().unwrap()
     }
 }

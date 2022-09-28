@@ -18,7 +18,7 @@ pub struct Vm {
 
 macro_rules! heap_load {
     ($self:ident, $address:ident, $name:ident) => {
-        let heap_lock = $self.heap.values.lock().unwrap();
+        let heap_lock = &$self.heap.values;
         let $name = heap_lock.get($address.as_address().clone()).unwrap();
     }
 }
@@ -34,18 +34,14 @@ impl Vm {
         }
     }
 
-    fn execute(&mut self, program: &UnsizedValue, gc_thread: &Thread) {
+    fn execute(&mut self, program: &UnsizedValue) {
         let mut i = 0;
         let program = program.as_function();
-        self.store.push();
         let mut counter = 0;
         while i < program.len() {
             counter += 1;
-            if counter % 100 == 0 {
-                let mut stack = self.stack.clone();
-                let mut heap = self.heap.clone();
-                let mut store = self.store.clone();
-                gc(&mut stack, &mut heap, &mut store);
+            if counter % 1000 == 0 {
+                // gc(&mut self.stack, &mut self.heap, &mut self.store);
             }
 
             let instruction = &program[i];
@@ -128,8 +124,8 @@ impl Vm {
                     let value = SizedValue::I64(*value);
                     self.stack.push(value);
                 }
-                OpCode::PushF32(value) => {
-                    let value = SizedValue::F32(*value);
+                OpCode::PushF64(value) => {
+                    let value = SizedValue::F64(*value);
                     self.stack.push(value);
                 }
                 OpCode::PushString(value) => {
@@ -156,16 +152,12 @@ impl Vm {
                     let value = self.heap.alloc(value);
                     self.stack.push(SizedValue::Address(value));
                 }
-                OpCode::Store => {
-                    let name_address = self.stack.pop();
-                    heap_load!(self, name_address, name);
+                OpCode::Store(address) => {
                     let value = self.stack.pop();
-                    self.store.set(name.as_string().clone(), value);
+                    self.store.set(address.clone(), value);
                 }
-                OpCode::Load => {
-                    let name_address = self.stack.pop();
-                    heap_load!(self, name_address, name);
-                    let value = self.store.get(name.as_string().clone());
+                OpCode::Load(address) => {
+                    let value = self.store.get(address.clone());
                     self.stack.push(value);
                 }
                 OpCode::Call => {}
@@ -186,30 +178,30 @@ impl Vm {
         }
 
         // println!("Stack: {:?}", self.stack);
-        // println!("Heap: {:?}", self.heap);
+        println!("Heap: {:?}", self.heap);
         println!("Variable Store: {:?}", self.store);
     }
 
 
     pub fn run(&mut self, program: &UnsizedValue) {
-        let gc_handle = self.start_gc_thread();
-        let gc_thread = gc_handle.thread();
+        // let gc_handle = self.start_gc_thread();
+        // let gc_thread = gc_handle.thread();
 
-        self.execute(program, gc_thread);
+        self.execute(program);
     }
 
     fn start_gc_thread(&self) -> JoinHandle<()> {
         let gc_handle = thread::spawn({
-            let mut stack = self.stack.clone();
-            let mut heap = self.heap.clone();
-            let mut store = self.store.clone();
+            // let mut stack = self.stack.clone();
+            // let mut heap = self.heap;
+            // let mut store = self.store.clone();
             move || loop {
                 thread::park();
-                let start = std::time::Instant::now();
-                gc(&mut stack, &mut heap, &mut store);
-                let end = std::time::Instant::now();
-                let duration = end.duration_since(start);
-                println!("GC took {:?}", duration);
+                // let start = std::time::Instant::now();
+                // gc(&mut stack, &mut heap, &mut store);
+                // let end = std::time::Instant::now();
+                // let duration = end.duration_since(start);
+                // println!("GC took {:?}", duration);
             }
         });
         gc_handle

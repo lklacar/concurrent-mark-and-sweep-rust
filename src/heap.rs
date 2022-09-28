@@ -29,30 +29,29 @@ impl UnsizedValue {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Heap {
-    pub(crate) values: Arc<Mutex<Vec<UnsizedValue>>>,
+    pub(crate) values: Vec<UnsizedValue>,
 }
 
 
 impl Heap {
     pub fn new() -> Heap {
         Heap {
-            values: Arc::new(Mutex::new(Vec::new())),
+            values: Vec::new(),
         }
     }
 
-    pub fn alloc(&self, value: UnsizedValue) -> usize {
-        let mut values = self.values.lock().unwrap();
-        values.push(value);
-        values.len() - 1
+    pub fn alloc(&mut self, value: UnsizedValue) -> usize {
+        self.values.push(value);
+        self.values.len() - 1
     }
 
     pub fn push(&mut self, value: UnsizedValue) {
-        self.values.lock().unwrap().push(value);
+        self.values.push(value);
     }
 
     pub fn pop(&mut self) -> UnsizedValue {
-        self.values.lock().unwrap().pop().unwrap()
+        self.values.pop().unwrap()
     }
 }
