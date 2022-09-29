@@ -6,31 +6,48 @@ use std::thread::JoinHandle;
 use crate::heap::{Heap, UnsizedValue};
 use crate::stack::{SizedValue, Stack};
 use crate::store::Store;
-use crate::{OpCode, PushI64};
+use crate::{OpCode};
 
 pub struct Vm {
     pub stack: Stack,
     pub heap: Heap,
     store: Store,
+    stdlib: HashMap<String, SizedValue>,
 }
 
-macro_rules! heap_load {
-    ($self:ident, $address:ident, $name:ident) => {
-        let heap_lock = &$self.heap.values;
-        let $name = heap_lock.get($address.as_address().clone()).unwrap();
-    };
+
+fn print(vm: &mut Vm) {
+    let value = vm.stack.pop();
+    match value {
+        SizedValue::Address(s) => {
+            let value = vm.heap.get(s);
+            println!("{}", value);
+        }
+        _ => println!("{}", value),
+    }
 }
+
+
 
 impl Vm {
     pub fn new() -> Vm {
         Vm {
             stack: Stack::new(),
             heap: Heap::new(),
-            store: Store::new(),
+            store: {
+                let mut store = Store::new();
+                store.set(9, SizedValue::Address(0));
+                store
+            },
+            stdlib: {
+                let mut map = HashMap::new();
+                map.insert("print".to_string(), SizedValue::FunctionPtr(print));
+                map
+            },
         }
     }
 
-    fn execute(&mut self, program: &UnsizedValue) {
+    pub fn execute(&mut self, program: &UnsizedValue) {
         let mut i = 0;
         let program = program.as_function();
         let mut counter = 0;
@@ -116,7 +133,7 @@ impl Vm {
                     let b = self.stack.pop();
                     self.stack.push(SizedValue::Bool(b >= a));
                 }
-                PushI64(value) => {
+                OpCode::PushI64(value) => {
                     let value = SizedValue::I64(*value);
                     self.stack.push(value);
                 }
@@ -138,8 +155,13 @@ impl Vm {
                     let value = self.heap.alloc(value);
                     self.stack.push(SizedValue::Address(value));
                 }
-                OpCode::PushList => {
-                    let value = UnsizedValue::List(Vec::new());
+                OpCode::PushList(size) => {
+                    let mut list = Vec::with_capacity(*size as usize);
+                    for _ in 0..*size {
+                        let value = self.stack.pop();
+                        list.push(value);
+                    }
+                    let value = UnsizedValue::new_list((list));
                     let value = self.heap.alloc(value);
                     self.stack.push(SizedValue::Address(value));
                 }
@@ -158,14 +180,18 @@ impl Vm {
                 }
                 OpCode::Call => {
                     let address = self.stack.pop();
-                    let address = address.as_address();
-                    let variable_address = self.store.get(address.clone());
 
-                    let function = self.heap.get(variable_address.as_address().clone());
+                    match address {
+                        SizedValue::Address(address) => {
+                            let function = self.heap.get(address.clone());
+                            self.execute(&function.clone());
 
-                    //TODO: Do this without cloning the function
-                    self.execute(&function.clone());
-
+                        }
+                        SizedValue::FunctionPtr(function_ptr) => {
+                            function_ptr(self);
+                        }
+                        _ => panic!("Expected address or function pointer, got {:?}", address),
+                    }
                 }
                 OpCode::Return => {}
                 OpCode::Jump(offset) => {
@@ -176,6 +202,44 @@ impl Vm {
                     if !value.as_bool() {
                         i = ((i as i64) + offset) as usize;
                     }
+                }
+                OpCode::Import(address, module) => {
+                    let module_name = module.clone();
+                    let module = self.stdlib.get(&module_name).unwrap();
+                    self.store.set(address.clone(), module.clone());
+                }
+                OpCode::ListAccess => {
+                    let index = self.stack.pop();
+                    let list = self.stack.pop();
+                    let list = list.as_address();
+                    let list = self.heap.get(list.clone());
+                    let list = list.as_list();
+                    let value = list[index.as_usize()].clone();
+                    self.stack.push(value);
+                }
+                OpCode::PropertyLoad => {
+                    let property_address = self.stack.pop();
+                    let property_address = property_address.as_address();
+                    let property = self.heap.get(property_address.clone());
+
+                    let object = self.stack.pop();
+                    let object_address = object.as_address();
+                    let object_value = self.heap.get(object_address.clone());
+
+                    let value = match object_value {
+                        UnsizedValue::List(list) => {
+                            let value = list.1.get(property.as_string()).unwrap();
+                            value.clone()
+                        }
+                        _ => panic!("Not a list"),
+                    };
+
+                    self.stack.push(value);
+                }
+                OpCode::Dup => {
+                    let value = self.stack.pop();
+                    self.stack.push(value.clone());
+                    self.stack.push(value);
                 }
             }
 

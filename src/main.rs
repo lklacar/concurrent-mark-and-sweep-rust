@@ -1,9 +1,7 @@
-extern crate core;
 
 use crate::heap::UnsizedValue;
 use crate::opcodes::OpCode;
 use crate::vm::Vm;
-use crate::OpCode::*;
 use std::fs::File;
 use std::io::Read;
 

@@ -21,7 +21,7 @@ pub enum OpCode {
     PushString(String),
     PushBool(bool),
     PushObject,
-    PushList,
+    PushList(usize),
 
     Function(Vec<OpCode>),
 
@@ -33,6 +33,11 @@ pub enum OpCode {
 
     Call,
     Return,
+
+    Import(usize, String),
+    ListAccess,
+    PropertyLoad,
+    Dup
 }
 
 impl OpCode {
@@ -100,7 +105,10 @@ impl OpCode {
                 OpCode::PushBool(value)
             }
             20 => OpCode::PushObject,
-            21 => OpCode::PushList,
+            21 => {
+                let size = Self::consume(vec, &mut i);
+                OpCode::PushList(size as usize)
+            },
             22 => {
                 let size = Self::consume(vec, &mut i);
                 let mut func = Vec::new();
@@ -113,7 +121,7 @@ impl OpCode {
                 }
 
                 OpCode::Function(func)
-            },
+            }
             23 => {
                 *i += 1;
                 let address = vec[*i];
@@ -134,6 +142,25 @@ impl OpCode {
             }
             27 => OpCode::Call,
             28 => OpCode::Return,
+            29 => {
+                let address = Self::consume(vec, &mut i) as usize;
+
+                let size = Self::consume(vec, &mut i);
+                let u64s = vec[(*i + 1)..(*i + size as usize + 1)].to_vec();
+                *i += size as usize;
+
+                let bytes = u64s
+                    .iter()
+                    .flat_map(|u| u.to_le_bytes().to_vec())
+                    .collect::<Vec<u8>>();
+
+                let string = String::from_utf8(bytes).unwrap();
+                let string = string.trim_end_matches(char::from(0)).to_string();
+                OpCode::Import(address, string)
+            }
+            30 => OpCode::ListAccess,
+            31 => OpCode::PropertyLoad,
+            32 => OpCode::Dup,
             _ => panic!("Unknown opcode {}", opcode),
         };
         opcode

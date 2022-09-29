@@ -39,7 +39,7 @@ pub fn gc(stack: &mut Stack, heap: &mut Heap, store: &mut Store) {
                         }
                     }
                     UnsizedValue::List(list) => {
-                        for value in list.iter() {
+                        for value in list.0.iter() {
                             match value {
                                 SizedValue::Address(address) => {
                                     marked.insert(*address);

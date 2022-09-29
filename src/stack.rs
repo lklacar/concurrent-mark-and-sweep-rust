@@ -1,13 +1,69 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, BitAnd, BitOr, Div, Mul, Neg, Not, Rem, Sub};
+use crate::Vm;
 
-#[derive(Debug, Clone, PartialOrd, PartialEq)]
+#[derive(Clone)]
 pub enum SizedValue {
     I64(i64),
     F64(f64),
     Bool(bool),
     Address(usize),
+    FunctionPtr(fn(&mut Vm)),
     Null,
 }
+
+impl Debug for SizedValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SizedValue::I64(i) => write!(f, "{}", i),
+            SizedValue::F64(val) => write!(f, "{}", val),
+            SizedValue::Bool(b) => write!(f, "{}", b),
+            SizedValue::Address(a) => write!(f, "{}", a),
+            SizedValue::FunctionPtr(_) => write!(f, "<function-ptr>"),
+            SizedValue::Null => write!(f, "<null>"),
+        }
+    }
+}
+
+impl PartialEq for SizedValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (SizedValue::I64(a), SizedValue::I64(b)) => a == b,
+            (SizedValue::F64(a), SizedValue::F64(b)) => a == b,
+            (SizedValue::Bool(a), SizedValue::Bool(b)) => a == b,
+            (SizedValue::Address(a), SizedValue::Address(b)) => a == b,
+            (SizedValue::Null, SizedValue::Null) => true,
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for SizedValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (SizedValue::I64(a), SizedValue::I64(b)) => a.partial_cmp(b),
+            (SizedValue::F64(a), SizedValue::F64(b)) => a.partial_cmp(b),
+            (SizedValue::Bool(a), SizedValue::Bool(b)) => a.partial_cmp(b),
+            (SizedValue::Address(a), SizedValue::Address(b)) => a.partial_cmp(b),
+            (SizedValue::Null, SizedValue::Null) => Some(std::cmp::Ordering::Equal),
+            _ => None,
+        }
+    }
+}
+
+impl Display for SizedValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SizedValue::I64(value) => write!(f, "{}", value),
+            SizedValue::F64(value) => write!(f, "{}", value),
+            SizedValue::Bool(value) => write!(f, "{}", value),
+            SizedValue::Address(value) => write!(f, "{}", value),
+            SizedValue::FunctionPtr(_) => write!(f, "<function-ptr>"),
+            SizedValue::Null => write!(f, "null"),
+        }
+    }
+}
+
 
 impl SizedValue {
     pub fn as_address(&self) -> &usize {
